@@ -46,7 +46,7 @@ namespace EasyCryptography
         }
 
 
-        public static PlainData CreateBytesRandom (int bytecount) {
+        public static PlainData Random (int bytecount) {
             using var rng = new RNGCryptoServiceProvider();
             var bytes = new byte[bytecount];
             rng.GetBytes(bytes);

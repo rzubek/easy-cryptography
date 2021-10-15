@@ -30,8 +30,8 @@ namespace EasyCryptography
         public void RandomnessExamples () {
 
             // just some cryptographically random bytes, they won't be equal of course
-            var random1 = Crypto.CreateBytesRandom(32);
-            var random2 = Crypto.CreateBytesRandom(32);
+            var random1 = Crypto.Random(32);
+            var random2 = Crypto.Random(32);
             AssertBytesDiffer(random1, random2);
         }
 
