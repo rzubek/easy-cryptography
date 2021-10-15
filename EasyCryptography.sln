@@ -1,0 +1,38 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.31727.386
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EasyCryptography", "EasyCryptography\EasyCryptography.csproj", "{0A8C94AF-436B-4A2D-B1AB-4E97DDCEE398}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestsAndExamples", "TestsAndExamples\TestsAndExamples.csproj", "{685FB2C0-BF83-4D13-B689-965D7A4E2FE8}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{7F33C735-18BB-4513-B93E-D0DA6321B14A}"
+	ProjectSection(SolutionItems) = preProject
+		.editorconfig = .editorconfig
+		LICENSE = LICENSE
+		README.md = README.md
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{0A8C94AF-436B-4A2D-B1AB-4E97DDCEE398}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0A8C94AF-436B-4A2D-B1AB-4E97DDCEE398}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0A8C94AF-436B-4A2D-B1AB-4E97DDCEE398}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0A8C94AF-436B-4A2D-B1AB-4E97DDCEE398}.Release|Any CPU.Build.0 = Release|Any CPU
+		{685FB2C0-BF83-4D13-B689-965D7A4E2FE8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{685FB2C0-BF83-4D13-B689-965D7A4E2FE8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{685FB2C0-BF83-4D13-B689-965D7A4E2FE8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{685FB2C0-BF83-4D13-B689-965D7A4E2FE8}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {C0DAD045-A605-47E8-889B-51D7F8180D15}
+	EndGlobalSection
+EndGlobal
