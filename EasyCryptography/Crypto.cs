@@ -5,6 +5,8 @@ using System.Text;
 
 namespace EasyCryptography
 {
+    #region Settings
+
     /// <summary>
     /// Settings used by all EasyCryptography operations.
     ///
@@ -74,6 +76,9 @@ namespace EasyCryptography
         public int AESKeySizeBytes => AESKeySize / 8;
     }
 
+    #endregion
+
+
     /// <summary>
     /// EasyCryptography is an easy-to-use wrapper around built-in .NET cryptography,
     /// providing a clean and simple API, and safe default settings for all
@@ -81,6 +86,9 @@ namespace EasyCryptography
     /// </summary>
     public static class Crypto
     {
+
+        #region Default settings
+
         /// <summary>
         /// These default settings provide good basic cryptography settings.
         /// By default the library will use AES-128 for symmetric encryption,
@@ -104,14 +112,18 @@ namespace EasyCryptography
         /// </summary>
         public static CryptoSettings Settings = DefaultSettings;
 
+        #endregion
+
+
+        #region Public API
 
         /// <summary>
         /// Computes the hash of input data.
         /// By default, it uses SHA256 and produces a 32-byte long hash.
         /// </summary>
-        public static Hash Hash (byte[] bytes) {
+        public static Hash Hash (byte[] data) {
             using var hash = HashAlgorithm.Create(Settings.HashAlgorithmID);
-            return new Hash { Bytes = hash.ComputeHash(bytes) };
+            return new Hash(hash.ComputeHash(data));
         }
 
         /// <summary>
@@ -120,22 +132,16 @@ namespace EasyCryptography
         /// </summary>
         public static Hash Hash (string text) => Hash(Encoding.UTF8.GetBytes(text));
 
-        /// <summary>
-        /// Computes the hash of input data.
-        /// By default, it uses SHA256 and produces a 32-byte long hash.
-        /// </summary>
-        public static Hash Hash (Data data) => Hash(data.Bytes);
-
 
         /// <summary>
         /// Generates a byte array filled with random numbers from a
         /// cryptographically-strong random number generator.
         /// </summary>
-        public static PlainData Random (int bytecount) {
+        public static byte[] Random (int bytecount) {
             using var rng = new RNGCryptoServiceProvider();
             var bytes = new byte[bytecount];
             rng.GetBytes(bytes);
-            return new PlainData { Bytes = bytes };
+            return bytes;
         }
 
         /// <summary>
@@ -144,7 +150,7 @@ namespace EasyCryptography
         /// <returns></returns>
         public static SecretKey CreateKeyRandom () {
             using var aes = NewAes();
-            var results = Data.Copy<SecretKey>(aes.Key);
+            var results = new SecretKey(aes.Key);
 
             aes.Clear();
             return results;
@@ -187,7 +193,7 @@ namespace EasyCryptography
             if (salt != null) { pbkdf2.Salt = salt; }
 
             var bytes = pbkdf2.GetBytes(Settings.AESKeySizeBytes);
-            return Data.Wrap<SecretKey>(bytes);
+            return new SecretKey(bytes);
         }
 
         /// <summary>
@@ -200,7 +206,7 @@ namespace EasyCryptography
         /// because the initialization vector is being randomized on each call. However, each of those
         /// results can be decrypted with the same key, as expected.
         /// </summary>
-        public static EncryptResults Encrypt (PlainData data, SecretKey key) =>
+        public static EncryptResult Encrypt (byte[] data, SecretKey key) =>
             Encrypt(data, key, null);
 
 
@@ -215,7 +221,7 @@ namespace EasyCryptography
         /// produce the same bytes in result. However, calling code can pass in a null initialization vector,
         /// in which case a new one will be generated randomly.
         /// </summary>
-        public static EncryptResults Encrypt (PlainData data, SecretKey key, InitializationVector iv) {
+        public static EncryptResult Encrypt (byte[] data, SecretKey key, InitializationVector iv) {
             // verify key length as expected
             if (key.Bytes.Length != Settings.AESKeySizeBytes) {
                 throw new ArgumentException("Unexpected key size", nameof(key));
@@ -224,10 +230,10 @@ namespace EasyCryptography
             using var aes = NewAes(key, iv);
             using var transform = aes.CreateEncryptor();
 
-            var encrypted = TransformData(data.Bytes, transform);
-            var results = new EncryptResults {
-                Init = Data.Copy<InitializationVector>(aes.IV),
-                Encrypted = Data.Copy<EncryptedData>(encrypted),
+            var encrypted = TransformData(data, transform);
+            var results = new EncryptResult {
+                Init = new InitializationVector(aes.IV),
+                Encrypted = new EncryptedData(encrypted),
             };
 
             aes.Clear();
@@ -243,7 +249,7 @@ namespace EasyCryptography
         /// encryption, otherwise the result will be a sequence of bytes of similar length as
         /// plain data but randomized content.
         /// </summary>
-        public static DecryptResults Decrypt (EncryptResults encrypted, SecretKey key) {
+        public static DecryptResult Decrypt (EncryptResult encrypted, SecretKey key) {
             // verify key length as expected
             if (key.Bytes.Length != Settings.AESKeySizeBytes) {
                 throw new ArgumentException("Unexpected key size", nameof(key));
@@ -253,38 +259,42 @@ namespace EasyCryptography
             using var transform = aes.CreateDecryptor();
 
             var decrypted = TransformData(encrypted.Encrypted.Bytes, transform);
-            var results = new DecryptResults { Decrypted = Data.Copy<PlainData>(decrypted) };
+            var results = new DecryptResult { Decrypted = decrypted };
 
             aes.Clear();
             return results;
         }
 
-
-
         /// <summary>
-        /// Creates a signature (authentication code) for the given data, using the given secret key.
-        /// The resulting signature will be unique to both the data and the key, and so it can be
-        /// used to confirm that a given key signed the data, and to detect data tampering.
+        /// Creates a signature (authentication tag) for the given data, using the given secret key.
+        /// The resulting signature will be unique to both the data and the key, and it can be
+        /// used to confirm that a given key signed the data, and to detect data modification.
         ///
+        /// Signatures work similarly to hashes, but are much more resistant to tampering (for example,
+        /// the chosen-prefix collision attack) at the cost of slightly slower execution time.
         /// This implementation uses HMAC with strength specified in settings.
         /// </summary>
-        public static Signature Sign (Data data, SecretKey key) {
-            using var hash = HMAC.Create(Settings.HMACAlgorithmID);
-            hash.Key = key.Bytes;
-            var result = hash.ComputeHash(data.Bytes);
-            return Data.Wrap<Signature>(result);
+        public static Signature Sign (byte[] data, SecretKey key) {
+            using var hmac = HMAC.Create(Settings.HMACAlgorithmID);
+            hmac.Key = key.Bytes;
+            var hash = hmac.ComputeHash(data);
+            var result = new Signature(hash);
+
+            hmac.Clear();
+            return result;
         }
 
         /// <summary>
-        /// Verifies a previously generated signature (authentication code) for given data and secret key.
+        /// Verifies a previously generated signature (authentication tag) for given data and secret key.
+        /// 
         /// This is done by generating a new signature for the given data and key, and comparing it
         /// to the provided signature. The function returns true if the signature matches the data and key,
         /// or false if it does not match, for example because the data or the key are not the same
         /// as those used to create the provided signature.
         /// </summary>
-        public static bool Verify (Signature signature, Data data, SecretKey key) {
+        public static bool Verify (Signature signature, byte[] data, SecretKey key) {
             var computed = Sign(data, key);
-            return computed.BytewiseEquals(signature);
+            return ByteArray.BytewiseEquals(computed, signature);
         }
 
 
@@ -294,7 +304,7 @@ namespace EasyCryptography
         ///
         /// This implementation uses HMAC in Encrypt-then-MAC mode, with hash strength specified in settings.
         /// </summary>
-        public static EncryptAndSignResult EncryptAndSign (PlainData data, SecretKey key) {
+        public static EncryptAndSignResult EncryptAndSign (byte[] data, SecretKey key) {
 
             // please note that we're using the same secret key for both encryption and signature.
             // some sources claim this could introduce weaknesses given some specific combinations
@@ -303,7 +313,7 @@ namespace EasyCryptography
             // (for discussion see: https://crypto.stackexchange.com/questions/8081/ )
 
             var encrypted = Encrypt(data, key);
-            var signature = Sign(encrypted.Encrypted, key);
+            var signature = Sign(encrypted.Encrypted.Bytes, key);
 
             return new EncryptAndSignResult {
                 Init = encrypted.Init,
@@ -320,18 +330,23 @@ namespace EasyCryptography
         /// the resulting boolean will be true and data will contain the original plain data that was encrypted.
         /// Otherwise the resulting boolean will be false, and data will be a null reference.
         /// </summary>
-        public static DecryptAndVerifyResults DecryptAndVerify (EncryptAndSignResult results, SecretKey key) {
+        public static DecryptAndVerifyResult DecryptAndVerify (EncryptAndSignResult results, SecretKey key) {
 
             // to get ahead of timing attacks, we always decrypt the data even if signature doesn't match
-            var encresults = new EncryptResults { Encrypted = results.Encrypted, Init = results.Init };
+            var encresults = new EncryptResult { Encrypted = results.Encrypted, Init = results.Init };
             var decrypted = Decrypt(encresults, key);
-            var valid = Verify(results.Signature, results.Encrypted, key);
+            var valid = Verify(results.Signature, results.Encrypted.Bytes, key);
 
-            return new DecryptAndVerifyResults {
+            return new DecryptAndVerifyResult {
                 IsSignatureValid = valid,
                 Decrypted = valid ? decrypted.Decrypted : null,
             };
         }
+
+        #endregion
+
+
+        #region Implementation details
 
         // helper function, generates a new AES instance with given parameters
         private static Aes NewAes (SecretKey key = null, InitializationVector iv = null) {
@@ -352,75 +367,118 @@ namespace EasyCryptography
             crypto.FlushFinalBlock();
             return memory.ToArray();
         }
+
+        #endregion
     }
 
 
-    public abstract class Data
+
+    #region Data containers
+
+    /// <summary>
+    /// Abstract wrapper around byte[], parent of multiple strongly-typed classes that describe
+    /// byte arrays with various semantics (secret key, encrypted data, signature, etc.)
+    ///
+    /// Because C# doesn't have facilities similar to `typedef` in C++, we do this by
+    /// wrapping byte[] in a helper class and providing strongly typed subclasses.
+    /// </summary>
+    public abstract class ByteArray
     {
         public byte[] Bytes { get; set; }
 
-        public bool BytewiseEquals (Data other) => BytewiseEquals(other.Bytes);
+        protected ByteArray (byte[] source) { 
+            Bytes = new byte[source.Length];
+            Array.Copy(source, Bytes, source.Length);
+        }
 
-        public bool BytewiseEquals (byte[] other) {
-            if (other == null) { throw new ArgumentNullException(nameof(other)); }
+        /// <summary>
+        /// Returns true if the two byte arrays are either both null or both have the same bytes.
+        /// </summary>
+        public static bool BytewiseEquals (ByteArray a, ByteArray b) => BytewiseEquals(a?.Bytes, b?.Bytes);
 
-            if (other.Length != Bytes.Length) { return false; }
+        /// <summary>
+        /// Returns true if the two byte arrays are either both null or both have the same bytes.
+        /// </summary>
+        public static bool BytewiseEquals (byte[] a, byte[] b) {
 
-            for (int i = 0, count = other.Length; i < count; i++) {
-                if (other[i] != Bytes[i]) { return false; }
+            if (a == null && b == null) { return true; }  // both null
+            if (a == null || b == null) { return false; } // one null but not the other
+
+            if (a.Length != b.Length) { return false; }
+
+            for (int i = 0, count = a.Length; i < count; i++) {
+                if (a[i] != b[i]) { return false; }
             }
 
             return true;
         }
-
-        public void FillWith (byte value) => Array.Fill(Bytes, value);
-
-        public void FillWithRandom () {
-            using var rng = new RNGCryptoServiceProvider();
-            rng.GetBytes(Bytes);
-        }
-
-
-        public static T MakeFilled<T> (int bytes, byte fill) where T : Data, new() {
-            var result = Wrap<T>(new byte[bytes]);
-            result.FillWith(fill);
-            return result;
-        }
-
-        public static T MakeRandom<T> (int bytes) where T : Data, new() {
-            var result = Wrap<T>(new byte[bytes]);
-            result.FillWithRandom();
-            return result;
-        }
-
-        public static T Wrap<T> (byte[] bytes) where T : Data, new() =>
-            new T() { Bytes = bytes };
-
-        public static T Copy<T> (byte[] bytes) where T : Data, new() {
-            var destination = new byte[bytes.Length];
-            Array.Copy(bytes, destination, bytes.Length);
-            return Wrap<T>(destination);
-        }
     }
 
-    public class SecretKey : Data { }
-    public class PlainData : Data { }
-    public class EncryptedData : Data { }
-    public class InitializationVector : Data { }
-    public class Hash : Data { }
-    public class Signature : Data { }
+    /// <summary>
+    /// Wrapper around a secret key used for encryption and signatures. Secret keys should be
+    /// treated as secret, and not saved along with encrypted data.
+    /// </summary>
+    public class SecretKey : ByteArray {
+        public SecretKey (byte[] source) : base(source) { }
+    }
 
-    public class EncryptResults
+    /// <summary>
+    /// Wrapper around a byte array containing the results of encryption. To recover original
+    /// data from encrypted data, one also needs initialization vector and secret key.
+    /// </summary>
+    public class EncryptedData : ByteArray {
+        public EncryptedData (byte[] source) : base(source) { }
+    }
+
+    /// <summary>
+    /// Wrapper around a byte array containing the initialization vector for some encrypted data.
+    /// This vector matches encrypted data and together they are needed during decryption.
+    /// </summary>
+    public class InitializationVector : ByteArray {
+        public InitializationVector (byte[] source) : base(source) { }
+    }
+
+    /// <summary>
+    /// Wrapper around a byte array containing the hash of some input data given some key.
+    /// </summary>
+    public class Hash : ByteArray {
+        public Hash (byte[] source) : base(source) { }
+    }
+
+    /// <summary>
+    /// Wrapper around a byte array containing the signature (aka authentication code or
+    /// authentication tag) for some input data given some key.
+    ///
+    /// Signatures work similarly to hashes, but are much more resistant to tampering (for example,
+    /// the chosen-prefix collision attack) at the cost of slightly slower execution time.
+    /// </summary>
+    public class Signature : ByteArray {
+        public Signature (byte[] source) : base(source) { }
+    }
+
+    /// <summary>
+    /// Wrapper for encryption result, which contains both the encrypted data and initialization vector.
+    /// Both need to be presented for decryption, along with the secret key.
+    /// </summary>
+    public class EncryptResult
     {
-        public InitializationVector Init;
         public EncryptedData Encrypted;
+        public InitializationVector Init;
     }
 
-    public class DecryptResults
+    /// <summary>
+    /// Wrapper for decryption result, which is just the byte array that was originally encrypted.
+    /// </summary>
+    public class DecryptResult
     {
-        public PlainData Decrypted;
+        public byte[] Decrypted;
     }
 
+    /// <summary>
+    /// Wrapper for encrypt and sign result, which contains both encryption result (broken down to
+    /// encrypted data and initialization vector) and the signature of encrypted data.
+    /// All three pieces need to be presented when trying to verify the signature and decrypt.
+    /// </summary>
     public class EncryptAndSignResult
     {
         public InitializationVector Init;
@@ -428,10 +486,17 @@ namespace EasyCryptography
         public Signature Signature;
     }
 
-    public class DecryptAndVerifyResults
+    /// <summary>
+    /// Results of trying to decrypt and verify the signature of some encrypted data.
+    /// It contains a boolean which is true if the signature was valid, and a byte array
+    /// which, if the signature was valid, is filled with the results of decryption or,
+    /// if the signature was not valid, is set to null.
+    /// </summary>
+    public class DecryptAndVerifyResult
     {
-        public PlainData Decrypted;
+        public byte[] Decrypted;
         public bool IsSignatureValid;
     }
 
+    #endregion
 }

@@ -15,6 +15,8 @@ This library came out of personal need to do similar data protection operations 
 and getting tired of the boilerplate, and of trying to remember how to set up the same settings every time.
 
 
+
+
 ## What it provides
 
 This library wraps the built-in crossplatform .NET System.Security.Cryptography libraries, in the following way:
@@ -41,7 +43,64 @@ and at other times on byte arrays, or relying on disposable classes for even sim
 This API standardizes access and hides those implementation details.
 
 
-### What are the common mistakes this prevents?
+## Examples
+
+Here are some usage examples:
+
+```csharp
+
+// we can make the key completely random, or from some specific password
+
+var key = Crypto.CreateKeyFromPassword("password", "salt"); // salt optional
+// or: var key = Crypto.CreateKeyRandom();
+
+// let's encrypt and decrypt some data
+// encrypted includes both the ciphertext and init vector
+
+var encrypted = Crypto.Encrypt(plainData, key);
+var decrypted = Crypto.Decrypt(encrypted, key);
+
+AssertBytesEqual(plainData, decrypted.Decrypted);
+
+// decryption by itself doesn't know if encrypted data might be invalid
+// or modified, so we have functions to both encrypt and sign the result,
+// which will detect any tampering or accidental changes.
+
+var encryptedSigned = Crypto.EncryptAndSign(plainData, key);
+var decryptedSigned = Crypto.DecryptAndVerify(encryptedSigned, key);
+
+Assert.IsTrue(decryptedSigned.IsSignatureValid);
+AssertBytesEqual(plainData, decryptedSigned.Decrypted);
+
+// we can also just sign any kind of a byte array and then verify
+// that it hasn't been changed
+
+var signature = Crypto.Sign(plainData, key);
+var isValid = Crypto.Verify(signature, plainData, key);
+
+Assert.IsTrue(isValid);
+
+// finally just a simple wrapper around strong hash 
+// and random number generator
+
+var random = Crypto.Random(32);
+
+var hash1 = Crypto.Hash("hello");
+var hash2 = Crypto.Hash(Encoding.UTF8.GetBytes("hello"));
+
+AssertBytesEqual(hash1, hash2);
+```
+
+### Default settings
+
+Settings are user-configurable, but the defaults are:
+  * Encrypt/decrypt: AES 128-bit in CRC mode (default in .NET)
+  * Sign/verify: HMAC using SHA256
+  * Create key: PBKDF2 using SHA256 and 10k iterations
+  * Hash: SHA256
+
+
+## What are the common mistakes this prevents?
 
 Implementing simple encryption or authenticity checking can be frustrating - there's a large number
 of algorithms, tuning values, or implementation choices. This is great for advanced users aware of 
@@ -71,11 +130,4 @@ This library aims to relieve these kinds of problems by making some very opinion
 (but still letting the user override default values with their own choices), 
 and hiding as many implementation details as possible.
 
-### Default settings
-
-Settings are user-configurable, but the defaults are:
-  * Encrypt/decrypt: AES 128-bit in CRC mode (default in .NET)
-  * Sign/verify: HMAC using SHA256
-  * Create key: PBKDF2 using SHA256 and 10k iterations
-  * Hash: SHA256
 

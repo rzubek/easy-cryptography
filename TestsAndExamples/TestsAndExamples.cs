@@ -1,11 +1,12 @@
 using NUnit.Framework;
+using System;
 using System.Text;
 
 namespace EasyCryptography
 {
     public class Tests
     {
-        public PlainData plainData = Data.MakeFilled<PlainData>(512, 42);
+        public byte[] plainData = MakeFilled(512, 42);
         public SecretKey key = Crypto.CreateKeyRandom();
 
         [Test]
@@ -48,17 +49,17 @@ namespace EasyCryptography
             AssertBytesEqual(plainData, decrypted.Decrypted);
 
             // if we mess with encrypted data, we'll get a mess back
-            var copyEncryptedData = Data.Copy<EncryptedData>(encrypted.Encrypted.Bytes);
+            var copyEncryptedData = new EncryptedData(encrypted.Encrypted.Bytes);
             copyEncryptedData.Bytes[0] = copyEncryptedData.Bytes[1] = 0;
-            var test = new EncryptResults { Encrypted = copyEncryptedData, Init = encrypted.Init };
+            var test = new EncryptResult { Encrypted = copyEncryptedData, Init = encrypted.Init };
             decrypted = Crypto.Decrypt(test, key);
 
             AssertBytesDiffer(plainData, decrypted.Decrypted);
 
             // alternatively if we mess with the initialization vector, we'll also get a mess back
-            var copyInitVector = Data.Copy<InitializationVector>(encrypted.Init.Bytes);
+            var copyInitVector = new InitializationVector(encrypted.Init.Bytes);
             copyInitVector.Bytes[0] = copyInitVector.Bytes[1] = 0;
-            test = new EncryptResults { Encrypted = encrypted.Encrypted, Init = copyInitVector };
+            test = new EncryptResult { Encrypted = encrypted.Encrypted, Init = copyInitVector };
             decrypted = Crypto.Decrypt(test, key);
 
             AssertBytesDiffer(plainData, decrypted.Decrypted);
@@ -67,7 +68,7 @@ namespace EasyCryptography
         [Test]
         public void SignedEncryptionExamples () {
 
-            // let's encrypt and sing some data
+            // let's encrypt and sign some data
             var encryptedSigned = Crypto.EncryptAndSign(plainData, key);
             var decryptedSigned = Crypto.DecryptAndVerify(encryptedSigned, key);
 
@@ -115,8 +116,8 @@ namespace EasyCryptography
             var key2 = Crypto.CreateKeyRandom();
             var key3 = Crypto.CreateKeyRandom();
 
-            Assert.IsFalse(key1.BytewiseEquals(key2));
-            Assert.IsFalse(key2.BytewiseEquals(key3));
+            Assert.IsFalse(ByteArray.BytewiseEquals(key1, key2));
+            Assert.IsFalse(ByteArray.BytewiseEquals(key2, key3));
 
             // keys created from the same salt/password should be the same,
             // but if we change the salt, they should change
@@ -136,8 +137,16 @@ namespace EasyCryptography
             AssertBytesEqual(nosaltkey1, nosaltkey2);
         }
 
+        private void AssertBytesEqual (byte[] a, byte[] b) => Assert.IsTrue(ByteArray.BytewiseEquals(a, b));
+        private void AssertBytesDiffer (byte[] a, byte[] b) => Assert.IsFalse(ByteArray.BytewiseEquals(a, b));
 
-        private void AssertBytesEqual (Data a, Data b) => Assert.IsTrue(a.BytewiseEquals(b));
-        private void AssertBytesDiffer (Data a, Data b) => Assert.IsFalse(a.BytewiseEquals(b));
+        private void AssertBytesEqual (ByteArray a, ByteArray b) => Assert.IsTrue(ByteArray.BytewiseEquals(a, b));
+        private void AssertBytesDiffer (ByteArray a, ByteArray b) => Assert.IsFalse(ByteArray.BytewiseEquals(a, b));
+
+        private static byte[] MakeFilled (int bytes, byte fill) {
+            var result = new byte[bytes];
+            Array.Fill(result, fill);
+            return result;
+        }
     }
 }
