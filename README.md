@@ -24,6 +24,7 @@ This library wraps the built-in crossplatform .NET System.Security.Cryptography 
   * Provides initialization, boilerplate, and teardown for all operations
   * Hides legacy algorithms 
   * Hides configuration options
+  * Single-file implementation that can be embedded in projects
 
 Some API highlights:
 
@@ -44,25 +45,24 @@ This API standardizes access and hides those implementation details.
 
 Implementing simple encryption or authenticity checking can be frustrating - there's a large number
 of algorithms, tuning values, or implementation choices. This is great for advanced users aware of 
-correct usage and tradeoffs, but not ideal for new users, or users who want simple encryption with sane defaults.
+correct usage and tradeoffs, but unnecessary for new users, or users who want simple encryption with sane defaults.
 
 On the other hand, when new users turn to web search or Stack Overflow to get started,
-they can find many examples of suboptimal or just flat-out problematic answers,
-which may be okay for illustration purposes but not for production use.
+they can find many examples of problematic or incorrect answers, which haven't been
+corrected or updated:
 
-Some specific example:
-  * Some examples show how to converting passwords into encryption keys by just grabbing the byte array of the string. 
-    This is a common mistake, but quite serious because strings don't have nearly enough randomness to be secure. 
+  * Some examples convert user passwords into encryption keys by just grabbing the byte array of the string. 
+    This is a common mistake, but very serious because strings don't have nearly enough randomness to be secure. 
     We have password derivation functions for that.
   * Some examples reuse IVs (initialization vectors), for example by declaring them as global constants.
     This can lead to vulnerabilities, because IVs are meant to be regenerated for each encryption operation -
     but they also need to be retained for use in decryption. Our implementation handles this.
-  * Some examples implement anti-tampering by hashing data with some salt and comparing hashes. 
-    This is vulnerable to spoofing, and we have signing API that provides HMAC authentication instead.
+  * Some examples implement anti-tampering by simply hashing data with some salt and comparing hashes. 
+    This is vulnerable to spoofing, and instead we have signing API that provides HMAC authentication.
   * Some examples use old, legacy algorithms such as SHA1 for hashing, or AES-ECB for encryption. 
     .NET provides many compatibility options, but unfortunately very little guidance, 
     and the alphabet soup makes this decision difficult for new users.
-  * Some cases of .NET documentation about encryption leads the user into trying to understand enterprise key management,
+  * Some cases of .NET documentation about encryption leads the user into trying to implement enterprise key management,
     storing keys in secure storage, and so on. This is appropriate for enterprise deployments, but is entirely
     inappropriate for small-scale projects, and can lead to data loss if the user mis-configures secure storage
     and loses access to their keys. This project side-steps all this, and lets the user handle keys just like other data.
