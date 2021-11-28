@@ -95,9 +95,30 @@ AssertBytesEqual(hash1, hash2);
 
 Settings are user-configurable, but the defaults are:
   * Encrypt/decrypt: AES 128-bit in CRC mode (default in .NET)
-  * Sign/verify: HMAC using SHA256
-  * Create key: PBKDF2 using SHA256 and 10k iterations
+  * Sign/verify: HMAC using SHA256 in EtM mode
+  * Create key: PBKDF2 using SHA256 and 100k iterations
   * Hash: SHA256
+
+#### Typesafe wrappers
+
+In order to prevent accidental reuse of data in wrong contexts, or conversions
+from string to byte arrays without going through appropriate steps, the library
+uses the following strongly typed wrappers around `byte[]` byte arrays:
+  * ByteArray - what cryptographers would call "plaintext", i.e. bytes before encryption
+  * SecretKey - key used for symmetric encryption. The API makes it easy to create from a string
+    password and (optional) salt via PBKDF, or from a strong random number generator.
+  * EncryptResult - contains two elements that need to be persisted for future decryption:
+    * EncryptedData - what cryptographers call "ciphertext", just the encrypted results.
+    * InitializationVector - initial random state that must be persisted for decryption. 
+      Init vector is not secret, but it needs be re-randomized each time we encrypt something.
+  * EncryptAndSignResult - contains three elements that need to be persisted for decryption and checking:
+    * EncryptedData - as above
+    * InitializationVector - as above
+    * Signature - byte array containing the cryptographic signature of the encrypted data,
+      to detect if EncryptedData array was accidentally or intentionally modified after encryption.
+  * DecryptResult - plaintext from decrypting ciphertext.
+  * DecryptAndVerifyResult - plaintext and results of verification.
+
 
 
 ## What are the common mistakes this prevents?
@@ -128,6 +149,16 @@ corrected or updated:
 
 This library aims to relieve these kinds of problems by making some very opinionated choices
 (but still letting the user override default values with their own choices), 
-and hiding as many implementation details as possible.
+and hiding as many implementation details as possible:
+
+  * Secret keys can be loaded from a byte array, generated from a string password (which will automatically 
+    invoke a strong derivation function), or generated uniquely from random data.
+  * IV gets regenerated during each encryption, and persisted in EncryptResult
+  * Encrypted results are signed with HMAC which is resistant to modification, extension attacks, etc.
+  * Encryption and signing algorithms are set to use modern and secure defaults
+  * Keys are stored and loaded from byte arrays, without making any assumptions about 
+    storing the keys inside any kind of enterprise key management systems.
+    Users can load them from environment variables, temp settings files, or some other method.
+
 
 
