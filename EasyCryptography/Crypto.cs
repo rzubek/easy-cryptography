@@ -209,7 +209,7 @@ namespace EasyCryptography
         /// because the initialization vector is being randomized on each call. However, each of those
         /// results can be decrypted with the same key, as expected.
         /// </summary>
-        public static Encrypted Encrypt (byte[] data, SecretKey key, bool sign) =>
+        public static Encrypted Encrypt (byte[] data, SecretKey key, bool sign = true) =>
             Encrypt(data, key, null, sign);
 
 
@@ -228,7 +228,7 @@ namespace EasyCryptography
         /// produce the same bytes in result. However, calling code can pass in a null initialization vector,
         /// in which case a new one will be generated randomly.
         /// </summary>
-        public static Encrypted Encrypt (byte[] data, SecretKey key, InitializationVector iv, bool sign) {
+        public static Encrypted Encrypt (byte[] data, SecretKey key, InitializationVector iv, bool sign = true) {
             // verify key length as expected
             if (key.Bytes.Length != Settings.AESKeySizeBytes) {
                 throw new ArgumentException("Unexpected key size", nameof(key));

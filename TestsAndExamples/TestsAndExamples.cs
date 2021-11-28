@@ -72,7 +72,7 @@ namespace EasyCryptography
         public void SignedEncryptionExamples () {
 
             // let's encrypt and sign some data
-            var encrypted = Crypto.Encrypt(plainData, key, true);
+            var encrypted = Crypto.Encrypt(plainData, key);
             var decrypted = Crypto.Decrypt(encrypted, key);
 
             Assert.IsTrue(decrypted.IsSignatureValid);
@@ -174,7 +174,7 @@ namespace EasyCryptography
             }
 
             {
-                var encsigned = Crypto.Encrypt(plainData, key, true);
+                var encsigned = Crypto.Encrypt(plainData, key);
                 var enc2bytes = encsigned.Save();
 
                 var encloaded = Encrypted.Load(enc2bytes);

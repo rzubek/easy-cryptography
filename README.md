@@ -140,6 +140,8 @@ corrected or updated:
   * Some examples reuse IVs (initialization vectors), for example by declaring them as global constants.
     This can lead to vulnerabilities, because IVs are meant to be regenerated for each encryption operation -
     but they also need to be retained for use in decryption. Our implementation handles this.
+  * Some examples ignore tampering issues. Decryption does not know whether someone tampered with encrypted bytes,
+    so an explicit signature is necessary on any data that might be modified by end-users.
   * Some examples implement anti-tampering by simply hashing data with some salt and comparing hashes. 
     This is vulnerable to spoofing, and instead we have signing API that provides HMAC authentication.
   * Some examples use old, legacy algorithms such as SHA1 for hashing, or AES-ECB for encryption. 
@@ -157,6 +159,7 @@ and hiding as many implementation details as possible:
   * Secret keys can be loaded from a byte array, generated from a string password (which will automatically 
     invoke a strong derivation function), or generated uniquely from random data.
   * IV gets regenerated during each encryption, and persisted in EncryptResult
+  * Encryption produces and checks anti-tampering signatures by default, but it can be turned off
   * Encrypted results are signed with HMAC which is resistant to modification, extension attacks, etc.
   * Encryption and signing algorithms are set to use modern and secure defaults
   * Keys are stored and loaded from byte arrays, without making any assumptions about 
