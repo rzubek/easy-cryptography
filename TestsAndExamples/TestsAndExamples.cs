@@ -40,72 +40,74 @@ namespace EasyCryptography
         }
 
         [Test]
-        public void EncryptionExamples () {
+        public void UnsignedEncryptionExamples () {
 
             // let's encrypt and decrypt some data
-            var encrypted = Crypto.Encrypt(plainData, key);
+            var encrypted = Crypto.Encrypt(plainData, key, false);
             var decrypted = Crypto.Decrypt(encrypted, key);
 
-            AssertBytesEqual(plainData, decrypted.Decrypted);
+            Assert.IsTrue(decrypted.IsNotSigned);
+            AssertBytesEqual(plainData, decrypted.Bytes);
 
             // if we mess with encrypted data, we'll get a mess back
-            var copyEncryptedData = new EncryptedData(encrypted.Encrypted.Bytes);
-            copyEncryptedData.Bytes[0] = copyEncryptedData.Bytes[1] = 0;
-            var test = new EncryptResult { Encrypted = copyEncryptedData, Init = encrypted.Init };
+            var copyenc = ByteArray<EncryptedBytes>.CopyFrom(encrypted.Data.Bytes);
+            copyenc.Bytes[0] = copyenc.Bytes[1] = 0;
+            var test = new Encrypted { Data = copyenc, Init = encrypted.Init, Signature = encrypted.Signature };
             decrypted = Crypto.Decrypt(test, key);
 
-            AssertBytesDiffer(plainData, decrypted.Decrypted);
+            Assert.IsTrue(decrypted.IsNotSigned);
+            AssertBytesDiffer(plainData, decrypted.Bytes);
 
             // alternatively if we mess with the initialization vector, we'll also get a mess back
-            var copyInitVector = new InitializationVector(encrypted.Init.Bytes);
-            copyInitVector.Bytes[0] = copyInitVector.Bytes[1] = 0;
-            test = new EncryptResult { Encrypted = encrypted.Encrypted, Init = copyInitVector };
+            var copyiv = ByteArray<InitializationVector>.CopyFrom(encrypted.Init.Bytes);
+            copyiv.Bytes[0] = copyiv.Bytes[1] = 0;
+            test = new Encrypted { Data = encrypted.Data, Init = copyiv, Signature = encrypted.Signature };
             decrypted = Crypto.Decrypt(test, key);
 
-            AssertBytesDiffer(plainData, decrypted.Decrypted);
+            Assert.IsTrue(decrypted.IsNotSigned);
+            AssertBytesDiffer(plainData, decrypted.Bytes);
         }
 
         [Test]
         public void SignedEncryptionExamples () {
 
             // let's encrypt and sign some data
-            var encryptedSigned = Crypto.EncryptAndSign(plainData, key);
-            var decryptedSigned = Crypto.DecryptAndVerify(encryptedSigned, key);
+            var encrypted = Crypto.Encrypt(plainData, key, true);
+            var decrypted = Crypto.Decrypt(encrypted, key);
 
-            Assert.IsTrue(decryptedSigned.IsSignatureValid);
-            Assert.IsNotNull(decryptedSigned.Decrypted);
-            AssertBytesEqual(plainData, decryptedSigned.Decrypted);
+            Assert.IsTrue(decrypted.IsSignatureValid);
+            AssertBytesEqual(plainData, decrypted.Bytes);
 
-            // now if we mess with encrypted data, we'll get a null back instead
+            // now if we mess with encrypted data, we'll get invalid flag back instead
             // so we know the data has been tampered with
-            encryptedSigned.Encrypted.Bytes[0] = encryptedSigned.Encrypted.Bytes[1] = 0;
-            decryptedSigned = Crypto.DecryptAndVerify(encryptedSigned, key);
+            encrypted.Data.Bytes[0] = encrypted.Data.Bytes[1] = 0;
+            decrypted = Crypto.Decrypt(encrypted, key);
 
-            Assert.IsFalse(decryptedSigned.IsSignatureValid);
-            Assert.IsNull(decryptedSigned.Decrypted);
+            Assert.IsTrue(decrypted.IsSignatureNotValid);
+            AssertBytesDiffer(plainData, decrypted.Bytes);
         }
 
         [Test]
         public void InitializationVectorExamples () {
             // let's encrypt and decrypt some data
-            var encrypted = Crypto.Encrypt(plainData, key);
-            var decrypted = Crypto.Decrypt(encrypted, key);
+            var encrypted = Crypto.Encrypt(plainData, key, false);
+            var decrypted = Crypto.Decrypt(encrypted, key).Bytes;
 
             // if we encrypt it again with the same key, we will *NOT* get the same cyphertext!
             // but we will of course get the same plaintext after decryption
-            var encryptedAgain = Crypto.Encrypt(plainData, key);
-            var decryptedAgain = Crypto.Decrypt(encryptedAgain, key);
+            var encryptedAgain = Crypto.Encrypt(plainData, key, false);
+            var decryptedAgain = Crypto.Decrypt(encryptedAgain, key).Bytes;
 
-            AssertBytesEqual(decrypted.Decrypted, decryptedAgain.Decrypted);
-            AssertBytesDiffer(encryptedAgain.Encrypted, encrypted.Encrypted);
+            AssertBytesEqual(decrypted, decryptedAgain);
+            AssertBytesDiffer(encryptedAgain.Data, encrypted.Data);
 
             // but if we re-encrypt with the same initialization vector,
             // the ciphertexts will match, and plaintexts will match
-            encryptedAgain = Crypto.Encrypt(plainData, key, encrypted.Init);
-            decryptedAgain = Crypto.Decrypt(encryptedAgain, key);
+            encryptedAgain = Crypto.Encrypt(plainData, key, encrypted.Init, false);
+            decryptedAgain = Crypto.Decrypt(encryptedAgain, key).Bytes;
 
-            AssertBytesEqual(decrypted.Decrypted, decryptedAgain.Decrypted);
-            AssertBytesEqual(encryptedAgain.Encrypted, encrypted.Encrypted);
+            AssertBytesEqual(decrypted, decryptedAgain);
+            AssertBytesEqual(encryptedAgain.Data, encrypted.Data);
         }
 
         [Test]
@@ -116,8 +118,8 @@ namespace EasyCryptography
             var key2 = Crypto.CreateKeyRandom();
             var key3 = Crypto.CreateKeyRandom();
 
-            Assert.IsFalse(ByteArray.BytewiseEquals(key1, key2));
-            Assert.IsFalse(ByteArray.BytewiseEquals(key2, key3));
+            Assert.IsFalse(Crypto.BytewiseEquals(key1, key2));
+            Assert.IsFalse(Crypto.BytewiseEquals(key2, key3));
 
             // keys created from the same salt/password should be the same,
             // but if we change the salt, they should change
@@ -137,11 +139,63 @@ namespace EasyCryptography
             AssertBytesEqual(nosaltkey1, nosaltkey2);
         }
 
-        private void AssertBytesEqual (byte[] a, byte[] b) => Assert.IsTrue(ByteArray.BytewiseEquals(a, b));
-        private void AssertBytesDiffer (byte[] a, byte[] b) => Assert.IsFalse(ByteArray.BytewiseEquals(a, b));
+        [Test]
+        public void TestSerialization () {
 
-        private void AssertBytesEqual (ByteArray a, ByteArray b) => Assert.IsTrue(ByteArray.BytewiseEquals(a, b));
-        private void AssertBytesDiffer (ByteArray a, ByteArray b) => Assert.IsFalse(ByteArray.BytewiseEquals(a, b));
+            // test simple ByteArray subtypes - they all work the same
+
+            {
+                var key2bytes = key.Save();
+                var keyloaded = SecretKey.Load(key2bytes);
+
+                AssertBytesEqual(key, keyloaded);
+            }
+
+            {
+                var signature = Crypto.Sign(plainData, key);
+                var sig2bytes = signature.Save();
+                var sigloaded = Signature.Load(sig2bytes);
+                var isSignatureValid = Crypto.Verify(sigloaded, plainData, key);
+
+                Assert.IsTrue(isSignatureValid);
+            }
+
+            // test encryption results 
+
+            {
+                var encrypted = Crypto.Encrypt(plainData, key, false);
+                var enc2bytes = encrypted.Save();
+
+                var encloaded = Encrypted.Load(enc2bytes);
+                var decrypted = Crypto.Decrypt(encloaded, key);
+
+                Assert.IsTrue(decrypted.IsNotSigned);
+                AssertBytesEqual(plainData, decrypted.Bytes);
+            }
+
+            {
+                var encsigned = Crypto.Encrypt(plainData, key, true);
+                var enc2bytes = encsigned.Save();
+
+                var encloaded = Encrypted.Load(enc2bytes);
+                var decrypted = Crypto.Decrypt(encloaded, key);
+
+                Assert.IsTrue(decrypted.IsSignatureValid);
+                AssertBytesEqual(plainData, decrypted.Bytes);
+            }
+        }
+
+        private void AssertBytesEqual (byte[] a, byte[] b) =>
+            Assert.IsTrue(Crypto.BytewiseEquals(a, b));
+
+        private void AssertBytesDiffer (byte[] a, byte[] b) =>
+            Assert.IsFalse(Crypto.BytewiseEquals(a, b));
+
+        private void AssertBytesEqual<T> (ByteArray<T> a, ByteArray<T> b) where T : ByteArray<T>, new() =>
+            Assert.IsTrue(Crypto.BytewiseEquals(a, b));
+
+        private void AssertBytesDiffer<T> (ByteArray<T> a, ByteArray<T> b) where T : ByteArray<T>, new() =>
+            Assert.IsFalse(Crypto.BytewiseEquals(a, b));
 
         private static byte[] MakeFilled (int bytes, byte fill) {
             var result = new byte[bytes];

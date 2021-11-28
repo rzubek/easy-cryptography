@@ -30,9 +30,10 @@ This library wraps the built-in crossplatform .NET System.Security.Cryptography 
 
 Some API highlights:
 
-  * `Encrypt()` and `Decrypt()` functions to encrypt/decrypt data with a given secret key 
-  * `EncryptAndSign()` and `DecryptAndVerify()` provide encryption and also detects third-party tampering
-  * `Sign()` and `Verify()` functions just compute/check anti-tampering signatures of any data
+  * `Encrypt()` function will encrypt some data with a given secret key, and add a signature to detect tampering
+    * Signatures are optional and can be skipped without affecting encryption
+  * `Decrypt()` function will decrypt data, and if a signature is present, check it and report whether it matches
+  * `Sign()` and `Verify()` functions just compute/check anti-tampering signatures of any byte array
   * `CreateKey*()` functions securely generate encryption keys (from string passwords, from byte array sources,
     or completely random)
   * `Hash()` computes strong hashes of any byte array 
@@ -57,28 +58,29 @@ var key = Crypto.CreateKeyFromPassword("password", "salt"); // salt optional
 // let's encrypt and decrypt some data
 // encrypted includes both the ciphertext and init vector
 
+var encrypted = Crypto.Encrypt(plainData, key, false);
+var decrypted = Crypto.Decrypt(encrypted, key);
+
+AssertBytesEqual(plainData, decrypted.Bytes);
+Assert.IsTrue(decrypted.IsNotSigned);
+
+// encryption by itself doesn't know if encrypted data might've been modified,
+// so by default we include extra cryptographic signature to detect if data
+// might have been tampered with between encryption and decryption
+
 var encrypted = Crypto.Encrypt(plainData, key);
 var decrypted = Crypto.Decrypt(encrypted, key);
 
-AssertBytesEqual(plainData, decrypted.Decrypted);
-
-// decryption by itself doesn't know if encrypted data might be invalid
-// or modified, so we have functions to both encrypt and sign the result,
-// which will detect any tampering or accidental changes.
-
-var encryptedSigned = Crypto.EncryptAndSign(plainData, key);
-var decryptedSigned = Crypto.DecryptAndVerify(encryptedSigned, key);
-
-Assert.IsTrue(decryptedSigned.IsSignatureValid);
-AssertBytesEqual(plainData, decryptedSigned.Decrypted);
+AssertBytesEqual(plainData, decrypted.Bytes);
+Assert.IsTrue(decrypted.IsSignatureValid);
 
 // we can also just sign any kind of a byte array and then verify
 // that it hasn't been changed
 
 var signature = Crypto.Sign(plainData, key);
-var isValid = Crypto.Verify(signature, plainData, key);
+var validated = Crypto.Verify(signature, plainData, key);
 
-Assert.IsTrue(isValid);
+Assert.IsTrue(validated);
 
 // finally just a simple wrapper around strong hash 
 // and random number generator
@@ -99,7 +101,8 @@ Settings are user-configurable, but the defaults are:
   * Create key: PBKDF2 using SHA256 and 100k iterations
   * Hash: SHA256
 
-#### Typesafe wrappers
+
+### Typesafe wrappers
 
 In order to prevent accidental reuse of data in wrong contexts, or conversions
 from string to byte arrays without going through appropriate steps, the library
