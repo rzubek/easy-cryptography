@@ -9,8 +9,8 @@ namespace EasyCryptography
         public void HashExamples () {
 
             // here's how to compute simple hashes
-            var hash1 = Crypto.Hash("hello");
-            var hash2 = Crypto.Hash(Encoding.UTF8.GetBytes("hello"));
+            var hash1 = EasyCryptography.Hash("hello");
+            var hash2 = EasyCryptography.Hash(Encoding.UTF8.GetBytes("hello"));
 
             AssertBytesEqual(hash1, hash2);
         }
@@ -19,8 +19,8 @@ namespace EasyCryptography
         public void RandomnessExamples () {
 
             // just some cryptographically random bytes, they won't be equal of course
-            var random1 = Crypto.Random(32);
-            var random2 = Crypto.Random(32);
+            var random1 = EasyCryptography.Random(32);
+            var random2 = EasyCryptography.Random(32);
 
             AssertBytesDiffer(random1, random2);
         }

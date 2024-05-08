@@ -1,9 +1,11 @@
 # Easy Cryptography
 
-Easy, simple C# API for common cryptography operations. 
+Greatly simplified C# API wrapper for common symmetric cryptography operations. 
 
-Based on built-in .NET crypto libraries, but with very simple API with safe defaults.
-
+- *Single-file library* that's ready to be dropped into other projects
+- Robust API with *safe defaults*
+- *Pure C#* implementation based on built-in .NET crypto libraries
+- Compatible with *.NET Core 8.0*
 
 
 ## What? Why?
@@ -13,7 +15,6 @@ without a lot of research into correct settings and arcane flags.
 
 This library came out of personal need to do similar data protection operations on several projects,
 and getting tired of the boilerplate, and of trying to remember how to set up the same settings every time.
-
 
 
 

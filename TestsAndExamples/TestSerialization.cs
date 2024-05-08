@@ -16,12 +16,12 @@ namespace EasyCryptography
             }
 
             {
-                var signature = Crypto.Sign(plainData, testKey);
+                var signature = EasyCryptography.Sign(plainData, testKey);
                 var sig2bytes = signature.ToBytes();
                 var sigloaded = Signature.FromBytes(sig2bytes);
-                var isSignatureValid = Crypto.Verify(sigloaded, plainData, testKey);
+                var isSignatureValid = EasyCryptography.Verify(sigloaded, plainData, testKey);
 
-                Assert.IsTrue(isSignatureValid);
+                Assert.That(isSignatureValid, Is.True);
             }
         }
 
@@ -30,24 +30,24 @@ namespace EasyCryptography
 
             // test encryption results 
             {
-                var encrypted = Crypto.Encrypt(plainData, testKey, false);
+                var encrypted = EasyCryptography.Encrypt(plainData, testKey, false);
                 var enc2bytes = encrypted.ToBytes();
 
                 var encloaded = Encrypted.FromBytes(enc2bytes);
-                var decrypted = Crypto.Decrypt(encloaded, testKey);
+                var decrypted = EasyCryptography.Decrypt(encloaded, testKey);
 
-                Assert.IsTrue(decrypted.IsSignatureMissing);
+                Assert.That(decrypted.IsSignatureMissing, Is.True);
                 AssertBytesEqual(plainData, decrypted.Data);
             }
 
             {
-                var encsigned = Crypto.Encrypt(plainData, testKey);
+                var encsigned = EasyCryptography.Encrypt(plainData, testKey);
                 var enc2bytes = encsigned.ToBytes();
 
                 var encloaded = Encrypted.FromBytes(enc2bytes);
-                var decrypted = Crypto.Decrypt(encloaded, testKey);
+                var decrypted = EasyCryptography.Decrypt(encloaded, testKey);
 
-                Assert.IsTrue(decrypted.IsSignatureValid);
+                Assert.That(decrypted.IsSignatureValid, Is.True);
                 AssertBytesEqual(plainData, decrypted.Data);
             }
         }
