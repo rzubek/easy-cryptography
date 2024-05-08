@@ -88,7 +88,7 @@ namespace EasyCryptography
         /// </summary>
         public static Hash Hash (byte[] data) {
             using var hash = Settings.HashAlgorithmGen();
-            return ByteArray<Hash>.CopyFrom(hash.ComputeHash(data));
+            return ByteArray<Hash>.RawCopyFrom(hash.ComputeHash(data));
         }
 
         /// <summary>
@@ -115,7 +115,7 @@ namespace EasyCryptography
         /// <returns></returns>
         public static SecretKey CreateSecretKeyRandom () {
             using var aes = NewAes();
-            var results = ByteArray<SecretKey>.CopyFrom(aes.Key);
+            var results = SecretKey.RawCopyFrom(aes.Key);
 
             aes.Clear();
             return results;
@@ -147,7 +147,7 @@ namespace EasyCryptography
             if (salt != null) { pbkdf2.Salt = salt; }
 
             var bytes = pbkdf2.GetBytes(Settings.AESKeySize / 8);
-            return ByteArray<SecretKey>.CopyFrom(bytes);
+            return SecretKey.RawCopyFrom(bytes);
         }
 
         /// <summary>
@@ -183,7 +183,7 @@ namespace EasyCryptography
         /// produce the same bytes in result. However, calling code can pass in a null initialization vector,
         /// in which case a new one will be generated randomly.
         /// </summary>
-        public static Encrypted Encrypt (byte[] data, SecretKey key, InitializationVector iv, bool sign = true) {
+        public static Encrypted Encrypt (byte[] data, SecretKey key, InitializationVector? iv, bool sign = true) {
             // verify key length as expected
             if (key.Data.Length != Settings.AESKeySize / 8) {
                 throw new ArgumentException("Unexpected key size", nameof(key));
@@ -202,11 +202,10 @@ namespace EasyCryptography
 
             var signature = sign ? Sign(encrypted, key).Data : new byte[0];
 
-            var results = new Encrypted {
-                IV = ByteArray<InitializationVector>.CopyFrom(aes.IV),
-                Data = ByteArray<EncryptedBytes>.CopyFrom(encrypted),
-                Signature = ByteArray<Signature>.CopyFrom(signature),
-            };
+            var results = new Encrypted(
+                EncryptedBytes.RawCopyFrom(encrypted),
+                InitializationVector.RawCopyFrom(aes.IV),
+                Signature.RawCopyFrom(signature));
 
             aes.Clear();
             return results;
@@ -257,7 +256,7 @@ namespace EasyCryptography
             using var hmac = Settings.HMACAlgorithmGen();
             hmac.Key = key.Data;
             var hash = hmac.ComputeHash(data);
-            var result = ByteArray<Signature>.CopyFrom(hash);
+            var result = Signature.RawCopyFrom(hash);
 
             hmac.Clear();
             return result;
@@ -284,7 +283,8 @@ namespace EasyCryptography
         #region Implementation details
 
         // helper function, generates a new AES instance with given parameters
-        private static Aes NewAes (SecretKey key = null, InitializationVector iv = null) {
+        // if key or initialization vector are null, it will use new random ones
+        private static Aes NewAes (SecretKey? key = null, InitializationVector? iv = null) {
             var aes = Aes.Create();
             aes.Mode = CipherMode.CBC;
             aes.KeySize = Settings.AESKeySize;
@@ -318,13 +318,13 @@ namespace EasyCryptography
     /// </summary>
     public abstract class ByteArray<T> where T : ByteArray<T>, new()
     {
-        public byte[] Data;
+        public byte[] Data = [];
 
         /// <summary> Serializes this object into a length-prefixed byte array </summary>
         public byte[] ToBytes () {
             using var mem = new MemoryStream();
             using var writer = new BinaryWriter(mem);
-            Serialize(writer);
+            WriteTo(writer);
             return mem.ToArray();
         }
 
@@ -332,11 +332,11 @@ namespace EasyCryptography
         public static T FromBytes (byte[] bytes) {
             using var mem = new MemoryStream(bytes);
             using var reader = new BinaryReader(mem);
-            return Deserialize(reader);
+            return ReadFrom(reader);
         }
 
         /// <summary> Makes a new object from a copy of the source array </summary>
-        public static T CopyFrom (byte[] source) {
+        public static T RawCopyFrom (byte[] source) {
             var bytes = new byte[source.Length];
             Array.Copy(source, bytes, source.Length);
             return new T() { Data = bytes };
@@ -344,12 +344,12 @@ namespace EasyCryptography
 
         #region Binary reader and writer utils
 
-        public void Serialize (BinaryWriter writer) {
+        internal void WriteTo (BinaryWriter writer) {
             writer.Write(Data.Length);
             writer.Write(Data);
         }
 
-        internal static T Deserialize (BinaryReader reader) {
+        internal static T ReadFrom (BinaryReader reader) {
             int len = reader.ReadInt32();
             var bytes = reader.ReadBytes(len);
             return new T() { Data = bytes };
@@ -406,19 +406,19 @@ namespace EasyCryptography
     /// encrypted data and initialization vector) and the signature of encrypted data.
     /// All three pieces need to be presented when trying to verify the signature and decrypt.
     /// </summary>
-    public class Encrypted
+    public class Encrypted (EncryptedBytes data, InitializationVector iV, Signature signature)
     {
-        public EncryptedBytes Data;
-        public InitializationVector IV;
-        public Signature Signature;
+        public EncryptedBytes Data = data;
+        public InitializationVector IV = iV;
+        public Signature Signature = signature;
 
         /// <summary> Serializes this object into a byte array </summary>
         public byte[] ToBytes () {
             using var mem = new MemoryStream();
             using var writer = new BinaryWriter(mem);
-            Data.Serialize(writer);
-            IV.Serialize(writer);
-            Signature.Serialize(writer);
+            Data.WriteTo(writer);
+            IV.WriteTo(writer);
+            Signature.WriteTo(writer);
             return mem.ToArray();
         }
 
@@ -426,10 +426,10 @@ namespace EasyCryptography
         public static Encrypted FromBytes (byte[] bytes) {
             using var mem = new MemoryStream(bytes);
             using var reader = new BinaryReader(mem);
-            var encr = EncryptedBytes.Deserialize(reader);
-            var init = InitializationVector.Deserialize(reader);
-            var sign = Signature.Deserialize(reader);
-            return new Encrypted { Data = encr, IV = init, Signature = sign };
+            var encr = EncryptedBytes.ReadFrom(reader);
+            var init = InitializationVector.ReadFrom(reader);
+            var sign = Signature.ReadFrom(reader);
+            return new Encrypted(encr, init, sign);
         }
     }
 
@@ -441,7 +441,7 @@ namespace EasyCryptography
         /// <summary>
         /// Byte array that contains the decrypted data
         /// </summary>
-        public byte[] Data;
+        public byte[] Data = [];
 
         /// <summary>
         /// This flag specifies whether a signature was present and/or checked
@@ -473,13 +473,13 @@ namespace EasyCryptography
         /// <summary>
         /// Returns true if the two byte arrays are either both null or both have the same bytes.
         /// </summary>
-        public static bool BytewiseEquals<T> (ByteArray<T> a, ByteArray<T> b) where T : ByteArray<T>, new()
+        public static bool BytewiseEquals<T> (ByteArray<T>? a, ByteArray<T>? b) where T : ByteArray<T>, new()
             => BytewiseEquals(a?.Data, b?.Data);
 
         /// <summary>
         /// Returns true if the two byte arrays are either both null or both have the same bytes.
         /// </summary>
-        public static bool BytewiseEquals (byte[] a, byte[] b) {
+        public static bool BytewiseEquals (byte[]? a, byte[]? b) {
 
             if (a == null && b == null) { return true; }  // both null
             if (a == null || b == null) { return false; } // one null but not the other

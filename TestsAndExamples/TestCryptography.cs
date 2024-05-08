@@ -25,18 +25,18 @@ namespace EasyCryptography
             AssertBytesEqual(plainData, decrypted.Data);
 
             // if we mess with encrypted data, we'll get a mess back
-            var copyenc = ByteArray<EncryptedBytes>.CopyFrom(encrypted.Data.Data);
+            var copyenc = EncryptedBytes.RawCopyFrom(encrypted.Data.Data);
             copyenc.Data[0] = copyenc.Data[1] = 0;
-            var test = new Encrypted { Data = copyenc, IV = encrypted.IV, Signature = encrypted.Signature };
+            var test = new Encrypted(copyenc, encrypted.IV, encrypted.Signature);
             decrypted = EasyCryptography.Decrypt(test, testKey);
 
             Assert.That(decrypted.IsSignatureMissing, Is.True);
             AssertBytesDiffer(plainData, decrypted.Data);
 
             // alternatively if we mess with the initialization vector, we'll also get a mess back
-            var copyiv = ByteArray<InitializationVector>.CopyFrom(encrypted.IV.Data);
+            var copyiv = InitializationVector.RawCopyFrom(encrypted.IV.Data);
             copyiv.Data[0] = copyiv.Data[1] = 0;
-            test = new Encrypted { Data = encrypted.Data, IV = copyiv, Signature = encrypted.Signature };
+            test = new Encrypted(encrypted.Data, copyiv, encrypted.Signature);
             decrypted = EasyCryptography.Decrypt(test, testKey);
 
             Assert.That(decrypted.IsSignatureMissing, Is.True);
