@@ -1,4 +1,5 @@
 ﻿using NUnit.Framework;
+using System;
 
 namespace EasyCryptography
 {
@@ -25,18 +26,18 @@ namespace EasyCryptography
             AssertBytesEqual(plainData, decrypted.Data);
 
             // if we mess with encrypted data, we'll get a mess back
-            var copyenc = EncryptedBytes.RawCopyFrom(encrypted.Data.Data);
+            var copyenc = CopyBytesInto<EncryptedPayload>(encrypted.Data.Data);
             copyenc.Data[0] = copyenc.Data[1] = 0;
-            var test = new Encrypted(copyenc, encrypted.IV, encrypted.Signature);
+            var test = new EncryptedData(copyenc, encrypted.IV, encrypted.Signature);
             decrypted = EasyCryptography.Decrypt(test, testKey);
 
             Assert.That(decrypted.IsSignatureMissing, Is.True);
             AssertBytesDiffer(plainData, decrypted.Data);
 
             // alternatively if we mess with the initialization vector, we'll also get a mess back
-            var copyiv = InitializationVector.RawCopyFrom(encrypted.IV.Data);
+            var copyiv = CopyBytesInto<InitializationVector>(encrypted.IV.Data);
             copyiv.Data[0] = copyiv.Data[1] = 0;
-            test = new Encrypted(encrypted.Data, copyiv, encrypted.Signature);
+            test = new EncryptedData(encrypted.Data, copyiv, encrypted.Signature);
             decrypted = EasyCryptography.Decrypt(test, testKey);
 
             Assert.That(decrypted.IsSignatureMissing, Is.True);
@@ -114,6 +115,13 @@ namespace EasyCryptography
             var nosaltkey2 = EasyCryptography.CreateKeyFromPassword("foo", "");
 
             AssertBytesEqual(nosaltkey1, nosaltkey2);
+        }
+
+        // makes a new object from a copy of the source array
+        private static T CopyBytesInto<T> (byte[] source) where T : ByteArray<T>, new() {
+            var bytes = new byte[source.Length];
+            Array.Copy(source, bytes, source.Length);
+            return new T() { Data = bytes };
         }
     }
 }

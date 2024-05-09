@@ -23,11 +23,11 @@ namespace EasyCryptography
         public int AESKeySize = 128;
 
         /// <summary>
-        /// Hash algorithm must be one of the allowed .NET hash names,
+        /// Hash algorithm must be one of the allowed .NET hash algorithms,
         /// such as SHA256, SHA512 and so on.
         ///
-        /// The default algorithm is SHA-256, which produces 32-byte hashes.
-        /// SHA-256 is recommended by NIST FIPS 180-3 standard and later.
+        /// The default algorithm is SHA256, which produces 32-byte hashes.
+        /// SHA256 is recommended by NIST FIPS 180-3 standard and later.
         /// </summary>
         public Func<HashAlgorithm> HashAlgorithmGen = () => SHA256.Create();
 
@@ -39,10 +39,10 @@ namespace EasyCryptography
         public HashAlgorithmName HashAlgorithmName = HashAlgorithmName.SHA256;
 
         /// <summary>
-        /// HMAC algorithm must be one of the allowed .NET HMAC names,
+        /// HMAC algorithm must be one of the allowed .NET HMAC algorithms,
         /// such as HMACSHA256, HMACSHA512, etc.
         ///
-        /// The default algorithm is HMAC SHA-256, which produces 32-byte hashes.
+        /// The default algorithm is HMACSHA256, which produces 32-byte hashes.
         /// </summary>
         public Func<HMAC> HMACAlgorithmGen = () => new HMACSHA256();
 
@@ -88,7 +88,7 @@ namespace EasyCryptography
         /// </summary>
         public static Hash Hash (byte[] data) {
             using var hash = Settings.HashAlgorithmGen();
-            return ByteArray<Hash>.RawCopyFrom(hash.ComputeHash(data));
+            return ByteArray<Hash>.CopyBytes(hash.ComputeHash(data));
         }
 
         /// <summary>
@@ -115,7 +115,7 @@ namespace EasyCryptography
         /// <returns></returns>
         public static SecretKey CreateSecretKeyRandom () {
             using var aes = NewAes();
-            var results = SecretKey.RawCopyFrom(aes.Key);
+            var results = SecretKey.CopyBytes(aes.Key);
 
             aes.Clear();
             return results;
@@ -147,7 +147,7 @@ namespace EasyCryptography
             if (salt != null) { pbkdf2.Salt = salt; }
 
             var bytes = pbkdf2.GetBytes(Settings.AESKeySize / 8);
-            return SecretKey.RawCopyFrom(bytes);
+            return SecretKey.CopyBytes(bytes);
         }
 
         /// <summary>
@@ -164,7 +164,7 @@ namespace EasyCryptography
         /// because the initialization vector is being randomized on each call. However, each of those
         /// results can be decrypted with the same key, as expected.
         /// </summary>
-        public static Encrypted Encrypt (byte[] data, SecretKey key, bool sign = true) =>
+        public static EncryptedData Encrypt (byte[] data, SecretKey key, bool sign = true) =>
             Encrypt(data, key, null, sign);
 
 
@@ -183,7 +183,7 @@ namespace EasyCryptography
         /// produce the same bytes in result. However, calling code can pass in a null initialization vector,
         /// in which case a new one will be generated randomly.
         /// </summary>
-        public static Encrypted Encrypt (byte[] data, SecretKey key, InitializationVector? iv, bool sign = true) {
+        public static EncryptedData Encrypt (byte[] data, SecretKey key, InitializationVector? iv, bool sign = true) {
             // verify key length as expected
             if (key.Data.Length != Settings.AESKeySize / 8) {
                 throw new ArgumentException("Unexpected key size", nameof(key));
@@ -200,12 +200,12 @@ namespace EasyCryptography
             // HMAC-SHA256 for hashing, and this combination has no such known weaknesses
             // (for discussion see: https://crypto.stackexchange.com/questions/8081/ )
 
-            var signature = sign ? Sign(encrypted, key).Data : new byte[0];
+            var signature = sign ? Sign(encrypted, key).Data : [];
 
-            var results = new Encrypted(
-                EncryptedBytes.RawCopyFrom(encrypted),
-                InitializationVector.RawCopyFrom(aes.IV),
-                Signature.RawCopyFrom(signature));
+            var results = new EncryptedData(
+                EncryptedPayload.CopyBytes(encrypted),
+                InitializationVector.CopyBytes(aes.IV),
+                Signature.CopyBytes(signature));
 
             aes.Clear();
             return results;
@@ -220,7 +220,7 @@ namespace EasyCryptography
         /// If the signature is present and matches the data, the validated flag will be returned as true,
         /// otherwise it will be returned as false.
         /// </summary>
-        public static Decrypted Decrypt (Encrypted encrypted, SecretKey key) {
+        public static DecryptedData Decrypt (EncryptedData encrypted, SecretKey key) {
             // verify key length as expected
             if (key.Data.Length != Settings.AESKeySize / 8) {
                 throw new ArgumentException("Unexpected key size", nameof(key));
@@ -240,7 +240,7 @@ namespace EasyCryptography
             var decrypted = TransformData(encrypted.Data.Data, transform);
             aes.Clear();
 
-            return new Decrypted { Data = decrypted, Result = result };
+            return new DecryptedData { Data = decrypted, Result = result };
         }
 
         /// <summary>
@@ -256,7 +256,7 @@ namespace EasyCryptography
             using var hmac = Settings.HMACAlgorithmGen();
             hmac.Key = key.Data;
             var hash = hmac.ComputeHash(data);
-            var result = Signature.RawCopyFrom(hash);
+            var result = Signature.CopyBytes(hash);
 
             hmac.Clear();
             return result;
@@ -335,20 +335,22 @@ namespace EasyCryptography
             return ReadFrom(reader);
         }
 
-        /// <summary> Makes a new object from a copy of the source array </summary>
-        public static T RawCopyFrom (byte[] source) {
+        #region Binary reader and writer utils
+
+        // makes a new object from a copy of the source array
+        internal static T CopyBytes (byte[] source) {
             var bytes = new byte[source.Length];
             Array.Copy(source, bytes, source.Length);
             return new T() { Data = bytes };
         }
 
-        #region Binary reader and writer utils
-
+        // writes as a length-prefixed byte array
         internal void WriteTo (BinaryWriter writer) {
             writer.Write(Data.Length);
             writer.Write(Data);
         }
 
+        // reads as a length-prefixed byte array
         internal static T ReadFrom (BinaryReader reader) {
             int len = reader.ReadInt32();
             var bytes = reader.ReadBytes(len);
@@ -367,12 +369,12 @@ namespace EasyCryptography
 
     /// <summary>
     /// Wrapper around a byte array containing the results of encryption. To recover original
-    /// data from encrypted data, one also needs initialization vector and secret key.
+    /// data from encrypted payload, one also needs initialization vector and secret key.
     /// </summary>
-    public class EncryptedBytes : ByteArray<EncryptedBytes> { }
+    public class EncryptedPayload : ByteArray<EncryptedPayload> { }
 
     /// <summary>
-    /// Wrapper around a byte array containing the initialization vector for some encrypted data.
+    /// Wrapper around a byte array containing the initialization vector for some encrypted payload.
     /// This vector matches encrypted data and together they are needed during decryption.
     /// </summary>
     public class InitializationVector : ByteArray<InitializationVector> { }
@@ -402,14 +404,14 @@ namespace EasyCryptography
     }
 
     /// <summary>
-    /// Wrapper for encrypt result, which contains both encryption result (broken down to
+    /// Wrapper for Encrypt() result, which contains both encryption result (broken down to
     /// encrypted data and initialization vector) and the signature of encrypted data.
     /// All three pieces need to be presented when trying to verify the signature and decrypt.
     /// </summary>
-    public class Encrypted (EncryptedBytes data, InitializationVector iV, Signature signature)
+    public class EncryptedData (EncryptedPayload data, InitializationVector iv, Signature signature)
     {
-        public EncryptedBytes Data = data;
-        public InitializationVector IV = iV;
+        public EncryptedPayload Data = data;
+        public InitializationVector IV = iv;
         public Signature Signature = signature;
 
         /// <summary> Serializes this object into a byte array </summary>
@@ -423,20 +425,20 @@ namespace EasyCryptography
         }
 
         /// <summary> Deserializes this object from a byte array </summary>
-        public static Encrypted FromBytes (byte[] bytes) {
+        public static EncryptedData FromBytes (byte[] bytes) {
             using var mem = new MemoryStream(bytes);
             using var reader = new BinaryReader(mem);
-            var encr = EncryptedBytes.ReadFrom(reader);
+            var encr = EncryptedPayload.ReadFrom(reader);
             var init = InitializationVector.ReadFrom(reader);
             var sign = Signature.ReadFrom(reader);
-            return new Encrypted(encr, init, sign);
+            return new EncryptedData(encr, init, sign);
         }
     }
 
     /// <summary>
-    /// Wrapper for decrypt results and signature verification.
+    /// Wrapper for Decrypt() results and signature verification.
     /// </summary>
-    public class Decrypted
+    public class DecryptedData
     {
         /// <summary>
         /// Byte array that contains the decrypted data

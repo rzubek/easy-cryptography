@@ -54,8 +54,8 @@ Here are some usage examples:
 
 // we can make the key completely random, or from some specific password
 
-var key = Crypto.CreateKeyFromPassword("password", "salt"); // salt optional
-// or: var key = Crypto.CreateKeyRandom();
+var key = EasyCryptography.CreateKeyFromPassword("password", "salt"); // salt optional
+// or: var key = EasyCryptography.CreateKeyRandom();
 
 // let's encrypt and decrypt some data
 // encrypted result includes both the ciphertext and init vector
@@ -64,24 +64,24 @@ var key = Crypto.CreateKeyFromPassword("password", "salt"); // salt optional
 // so by default we include extra cryptographic signature to detect if data
 // might have been tampered with between encryption and decryption
 
-var encrypted = Crypto.Encrypt(plainData, key);
-var decrypted = Crypto.Decrypt(encrypted, key);
+var encrypted = EasyCryptography.Encrypt(plainData, key);
+var decrypted = EasyCryptography.Decrypt(encrypted, key);
 
 AssertBytesEqual(plainData, decrypted.Bytes);
 Assert.IsTrue(decrypted.IsSignatureValid);
 
 // optionally we can skip signing and save ourselves 16 bytes 
 
-var encrypted = Crypto.Encrypt(plainData, key, false);
-var decrypted = Crypto.Decrypt(encrypted, key);
+var encrypted = EasyCryptography.Encrypt(plainData, key, false);
+var decrypted = EasyCryptography.Decrypt(encrypted, key);
 
 AssertBytesEqual(plainData, decrypted.Bytes);
 Assert.IsTrue(decrypted.IsNotSigned);
 
 // encryption results can be easily serialized into a byte array and back
 
-byte[] encbytes = Crypto.Encrypt(plainData, key).Save();
-var decrypted = Crypto.Decrypt(Encrypted.Load(encbytes), key);
+byte[] encbytes = EasyCryptography.Encrypt(plainData, key).ToBytes();
+var decrypted = EasyCryptography.Decrypt(Encrypted.FromBytes(encbytes), key);
 
 Assert.IsTrue(decrypted.IsSignatureValid);
 AssertBytesEqual(plainData, decrypted.Bytes);
@@ -90,18 +90,18 @@ AssertBytesEqual(plainData, decrypted.Bytes);
 // we can also just sign any kind of a byte array and then verify
 // that it hasn't been changed
 
-var signature = Crypto.Sign(plainData, key);
-var validated = Crypto.Verify(signature, plainData, key);
+var signature = EasyCryptography.Sign(plainData, key);
+var validated = EasyCryptography.Verify(signature, plainData, key);
 
 Assert.IsTrue(validated);
 
 // finally just a simple wrapper around strong hash 
 // and random number generator
 
-var random = Crypto.Random(32);
+var random = EasyCryptography.Random(32);
 
-var hash1 = Crypto.Hash("hello");
-var hash2 = Crypto.Hash(Encoding.UTF8.GetBytes("hello"));
+var hash1 = EasyCryptography.Hash("hello");
+var hash2 = EasyCryptography.Hash(Encoding.UTF8.GetBytes("hello"));
 
 AssertBytesEqual(hash1, hash2);
 ```
@@ -111,7 +111,7 @@ AssertBytesEqual(hash1, hash2);
 Settings are user-configurable, but the defaults are:
   * Encrypt/decrypt: AES 128-bit in CRC mode (default in .NET)
   * Sign/verify: HMAC using SHA256 in EtM mode
-  * Create key: PBKDF2 using SHA256 and 100k iterations
+  * Create key: PBKDF2 using SHA256 and 10k iterations
   * Hash: SHA256
 
 
@@ -120,16 +120,16 @@ Settings are user-configurable, but the defaults are:
 In order to prevent accidental reuse of data in wrong contexts, or conversions
 from string to byte arrays without going through appropriate steps, the library
 uses the following strongly typed wrappers around `byte[]` byte arrays:
-  * SecretKey - key used for symmetric encryption. The API makes it easy to create from a string
+  * SecretKey - key used for symmetric encryption. The API makes it easy to create one from a string
     password and (optional) salt via PBKDF, or from a strong random number generator.
-  * Encrypted - contains three elements that need to be persisted for decryption and checking:
-    * EncryptedData - the encrypted results, i.e. the ciphertext produced by encryption
+  * EncryptedData - contains three elements that need to be persisted for decryption and checking:
+    * EncryptedPayload - the encrypted results, i.e. the ciphertext produced by encryption
     * InitializationVector - initial random state that must be persisted for decryption 
     * Signature - byte array containing the cryptographic signature of the encrypted data,
       to detect if EncryptedData array was accidentally or intentionally modified after encryption
-  * Decrypted - contains two elements produced by decryption
-    * Bytes - byte array that contains the result of decryption, and
-    * Result - flag that specifies whether the signature was valid / invalid / not present
+  * DecryptedData - contains two elements produced by decryption
+    * byte[] Data - byte array that contains the result of decryption, and
+    * SignatureValidationResult - flag that specifies whether the signature was valid / invalid / not present
   * Signature - byte array that is the cryptographic signature of some data using a secret key
   * Hash - byte array that is the hash (specifically secure HMAC) of some input data
 

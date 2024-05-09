@@ -5,7 +5,7 @@ namespace EasyCryptography
     public class TestSerialization : TestClass
     {
         [Test]
-        public void TestSimpleSerialization () {
+        public void TestSaveAndLoad () {
 
             // test simple ByteArray subtypes - they all work the same
             {
@@ -33,7 +33,7 @@ namespace EasyCryptography
                 var encrypted = EasyCryptography.Encrypt(plainData, testKey, false);
                 var enc2bytes = encrypted.ToBytes();
 
-                var encloaded = Encrypted.FromBytes(enc2bytes);
+                var encloaded = EncryptedData.FromBytes(enc2bytes);
                 var decrypted = EasyCryptography.Decrypt(encloaded, testKey);
 
                 Assert.That(decrypted.IsSignatureMissing, Is.True);
@@ -44,7 +44,7 @@ namespace EasyCryptography
                 var encsigned = EasyCryptography.Encrypt(plainData, testKey);
                 var enc2bytes = encsigned.ToBytes();
 
-                var encloaded = Encrypted.FromBytes(enc2bytes);
+                var encloaded = EncryptedData.FromBytes(enc2bytes);
                 var decrypted = EasyCryptography.Decrypt(encloaded, testKey);
 
                 Assert.That(decrypted.IsSignatureValid, Is.True);
